@@ -1,11 +1,11 @@
 require 'spec_helper'
 
-describe Gush::Workflow do
+describe Flush::Workflow do
   subject { TestWorkflow.create }
 
   describe "#initialize" do
     it "passes constructor arguments to the method" do
-      klass = Class.new(Gush::Workflow) do
+      klass = Class.new(Flush::Workflow) do
         def configure(*args)
           run FetchFirstJob
           run PersistFirstJob, after: FetchFirstJob
@@ -84,7 +84,7 @@ describe Gush::Workflow do
 
   describe "#to_json" do
     it "returns correct hash" do
-      klass = Class.new(Gush::Workflow) do
+      klass = Class.new(Flush::Workflow) do
         def configure(*args)
           run FetchFirstJob
           run PersistFirstJob, after: FetchFirstJob
@@ -142,26 +142,26 @@ describe Gush::Workflow do
 
   describe "#run" do
     it "allows passing additional params to the job" do
-      flow = Gush::Workflow.new
-      flow.run(Gush::Job, params: { something: 1 })
+      flow = Flush::Workflow.new
+      flow.run(Flush::Job, params: { something: 1 })
       flow.save
       expect(flow.jobs.first.params).to eq ({ something: 1 })
     end
 
     context "when graph is empty" do
       it "adds new job with the given class as a node" do
-        flow = Gush::Workflow.new
-        flow.run(Gush::Job)
+        flow = Flush::Workflow.new
+        flow.run(Flush::Job)
         flow.save
-        expect(flow.jobs.first).to be_instance_of(Gush::Job)
+        expect(flow.jobs.first).to be_instance_of(Flush::Job)
       end
     end
 
     it "allows `after` to accept an array of jobs" do
-      tree = Gush::Workflow.new
-      klass1 = Class.new(Gush::Job)
-      klass2 = Class.new(Gush::Job)
-      klass3 = Class.new(Gush::Job)
+      tree = Flush::Workflow.new
+      klass1 = Class.new(Flush::Job)
+      klass2 = Class.new(Flush::Job)
+      klass3 = Class.new(Flush::Job)
       tree.run(klass1)
       tree.run(klass2, after: [klass1, klass3])
       tree.run(klass3)
@@ -172,10 +172,10 @@ describe Gush::Workflow do
     end
 
     it "allows `before` to accept an array of jobs" do
-      tree = Gush::Workflow.new
-      klass1 = Class.new(Gush::Job)
-      klass2 = Class.new(Gush::Job)
-      klass3 = Class.new(Gush::Job)
+      tree = Flush::Workflow.new
+      klass1 = Class.new(Flush::Job)
+      klass2 = Class.new(Flush::Job)
+      klass3 = Class.new(Flush::Job)
       tree.run(klass1)
       tree.run(klass2, before: [klass1, klass3])
       tree.run(klass3)
@@ -186,9 +186,9 @@ describe Gush::Workflow do
     end
 
     it "attaches job as a child of the job in `after` key" do
-      tree = Gush::Workflow.new
-      klass1 = Class.new(Gush::Job)
-      klass2 = Class.new(Gush::Job)
+      tree = Flush::Workflow.new
+      klass1 = Class.new(Flush::Job)
+      klass2 = Class.new(Flush::Job)
       tree.run(klass1)
       tree.run(klass2, after: klass1)
       tree.resolve_dependencies
@@ -197,9 +197,9 @@ describe Gush::Workflow do
     end
 
     it "attaches job as a parent of the job in `before` key" do
-      tree = Gush::Workflow.new
-      klass1 = Class.new(Gush::Job)
-      klass2 = Class.new(Gush::Job)
+      tree = Flush::Workflow.new
+      klass1 = Class.new(Flush::Job)
+      klass2 = Class.new(Flush::Job)
       tree.run(klass1)
       tree.run(klass2, before: klass1)
       tree.resolve_dependencies

@@ -8,20 +8,20 @@ require "securerandom"
 require "sidekiq"
 require "multi_json"
 
-require "gush/json"
-require "gush/cli"
-require "gush/cli/overview"
-require "gush/graph"
-require "gush/client"
-require "gush/configuration"
-require "gush/errors"
-require "gush/job"
-require "gush/worker"
-require "gush/workflow"
+require "flush/json"
+require "flush/cli"
+require "flush/cli/overview"
+require "flush/graph"
+require "flush/client"
+require "flush/configuration"
+require "flush/errors"
+require "flush/job"
+require "flush/worker"
+require "flush/workflow"
 
-module Gush
-  def self.gushfile
-    configuration.gushfile
+module Flush
+  def self.flushfile
+    configuration.flushfile
   end
 
   def self.root
@@ -48,4 +48,4 @@ module Gush
   end
 end
 
-Gush.reconfigure_sidekiq
+Flush.reconfigure_sidekiq

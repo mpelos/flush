@@ -1,25 +1,25 @@
-module Gush
+module Flush
   class Configuration
     attr_accessor :concurrency, :namespace, :redis_url, :environment
 
     def self.from_json(json)
-      new(Gush::JSON.decode(json, symbolize_keys: true))
+      new(Flush::JSON.decode(json, symbolize_keys: true))
     end
 
     def initialize(hash = {})
       self.concurrency = hash.fetch(:concurrency, 5)
-      self.namespace   = hash.fetch(:namespace, 'gush')
+      self.namespace   = hash.fetch(:namespace, 'flush')
       self.redis_url   = hash.fetch(:redis_url, 'redis://localhost:6379')
-      self.gushfile    = hash.fetch(:gushfile, 'Gushfile.rb')
+      self.flushfile    = hash.fetch(:flushfile, 'Flushfile.rb')
       self.environment = hash.fetch(:environment, 'development')
     end
 
-    def gushfile=(path)
-      @gushfile = Pathname(path)
+    def flushfile=(path)
+      @flushfile = Pathname(path)
     end
 
-    def gushfile
-      @gushfile.realpath
+    def flushfile
+      @flushfile.realpath
     end
 
     def to_hash
@@ -32,7 +32,7 @@ module Gush
     end
 
     def to_json
-      Gush::JSON.encode(to_hash)
+      Flush::JSON.encode(to_hash)
     end
   end
 end

@@ -1,4 +1,4 @@
-module Gush
+module Flush
   class Job
     attr_accessor :workflow_id, :incoming, :outgoing, :params,
       :finished_at, :failed_at, :started_at, :enqueued_at, :payloads_hash, :klass
@@ -26,7 +26,7 @@ module Gush
     end
 
     def to_json(options = {})
-      Gush::JSON.encode(as_json)
+      Flush::JSON.encode(as_json)
     end
 
     def self.from_hash(flow, hash)

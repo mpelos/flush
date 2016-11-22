@@ -5,9 +5,9 @@ require 'launchy'
 require 'sidekiq'
 require 'sidekiq/api'
 
-module Gush
+module Flush
   class CLI < Thor
-    class_option :gushfile, desc: "configuration file to use", aliases: "-f"
+    class_option :flushfile, desc: "configuration file to use", aliases: "-f"
     class_option :concurrency, desc: "concurrency setting for Sidekiq", aliases: "-c"
     class_option :redis, desc: "Redis URL to use", aliases: "-r"
     class_option :namespace, desc: "namespace to run jobs in", aliases: "-n"
@@ -15,21 +15,21 @@ module Gush
 
     def initialize(*)
       super
-      Gush.configure do |config|
-        config.gushfile    = options.fetch("gushfile",    config.gushfile)
+      Flush.configure do |config|
+        config.flushfile    = options.fetch("flushfile",    config.flushfile)
         config.concurrency = options.fetch("concurrency", config.concurrency)
         config.redis_url   = options.fetch("redis",       config.redis_url)
         config.namespace   = options.fetch("namespace",   config.namespace)
         config.environment = options.fetch("environment", config.environment)
       end
-      load_gushfile
+      load_flushfile
     end
 
     desc "create [WorkflowClass]", "Registers new workflow"
     def create(name)
       workflow = client.create_workflow(name)
       puts "Workflow created with id: #{workflow.id}"
-      puts "Start it with command: gush start #{workflow.id}"
+      puts "Start it with command: flush start #{workflow.id}"
     end
 
     desc "start [workflow_id]", "Starts Workflow with given ID"
@@ -92,7 +92,7 @@ module Gush
     desc "workers", "Starts Sidekiq workers"
     def workers
       config = client.configuration
-      Kernel.exec "bundle exec sidekiq -r #{config.gushfile} -c #{config.concurrency} -q #{config.namespace} -e #{config.environment} -v"
+      Kernel.exec "bundle exec sidekiq -r #{config.flushfile} -c #{config.concurrency} -q #{config.namespace} -e #{config.environment} -v"
     end
 
     desc "viz [WorkflowClass]", "Displays graph, visualising job dependencies"
@@ -126,13 +126,13 @@ module Gush
       puts overview(workflow).jobs_list(jobs)
     end
 
-    def gushfile
-      Gush.configuration.gushfile
+    def flushfile
+      Flush.configuration.flushfile
     end
 
-    def load_gushfile
-      file = client.configuration.gushfile
-      if !gushfile.exist?
+    def load_flushfile
+      file = client.configuration.flushfile
+      if !flushfile.exist?
         raise Thor::Error, "#{file} not found, please add it to your project".colorize(:red)
       end
 

@@ -1,6 +1,6 @@
 require 'sidekiq'
 
-module Gush
+module Flush
   class Worker
     include ::Sidekiq::Worker
     sidekiq_options retry: false
@@ -35,7 +35,7 @@ module Gush
     attr_reader :client, :workflow, :job
 
     def client
-      @client ||= Gush::Client.new(Gush.configuration)
+      @client ||= Flush::Client.new(Flush.configuration)
     end
 
     def setup_job(workflow_id, job_id)

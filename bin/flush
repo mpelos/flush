@@ -7,12 +7,12 @@ bin_file = Pathname.new(__FILE__).realpath
 # add self to libpath
 $:.unshift File.expand_path("../../lib", bin_file)
 
-require 'gush'
+require 'flush'
 
 begin
-  Gush::CLI.start(ARGV)
-rescue Gush::WorkflowNotFound
+  Flush::CLI.start(ARGV)
+rescue Flush::WorkflowNotFound
   puts "Workflow not found".red
-rescue Gush::DependencyLevelTooDeep
+rescue Flush::DependencyLevelTooDeep
   puts "Dependency level too deep. Perhaps you have a dependency cycle?".red
 end

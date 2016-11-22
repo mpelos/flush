@@ -1,8 +1,8 @@
-module Gush
+module Flush
   class Client
     attr_reader :configuration, :sidekiq
 
-    def initialize(config = Gush.configuration)
+    def initialize(config = Flush.configuration)
       @configuration = config
       @sidekiq = build_sidekiq
     end
@@ -48,7 +48,7 @@ module Gush
         id = SecureRandom.uuid
         job_identifier = "#{job_klass}-#{id}"
         available = connection_pool.with do |redis|
-          !redis.exists("gush.jobs.#{workflow_id}.#{job_identifier}")
+          !redis.exists("flush.jobs.#{workflow_id}.#{job_identifier}")
         end
 
         break if available
@@ -62,7 +62,7 @@ module Gush
       loop do
         id = SecureRandom.uuid
         available = connection_pool.with do |redis|
-          !redis.exists("gush.workflow.#{id}")
+          !redis.exists("flush.workflow.#{id}")
         end
 
         break if available
@@ -73,8 +73,8 @@ module Gush
 
     def all_workflows
       connection_pool.with do |redis|
-        redis.keys("gush.workflows.*").map do |key|
-          id = key.sub("gush.workflows.", "")
+        redis.keys("flush.workflows.*").map do |key|
+          id = key.sub("flush.workflows.", "")
           find_workflow(id)
         end
       end
@@ -82,12 +82,12 @@ module Gush
 
     def find_workflow(id)
       connection_pool.with do |redis|
-        data = redis.get("gush.workflows.#{id}")
+        data = redis.get("flush.workflows.#{id}")
 
         unless data.nil?
-          hash = Gush::JSON.decode(data, symbolize_keys: true)
-          keys = redis.keys("gush.jobs.#{id}.*")
-          nodes = redis.mget(*keys).map { |json| Gush::JSON.decode(json, symbolize_keys: true) }
+          hash = Flush::JSON.decode(data, symbolize_keys: true)
+          keys = redis.keys("flush.jobs.#{id}.*")
+          nodes = redis.mget(*keys).map { |json| Flush::JSON.decode(json, symbolize_keys: true) }
           workflow_from_hash(hash, nodes)
         else
           raise WorkflowNotFound.new("Workflow with given id doesn't exist")
@@ -97,7 +97,7 @@ module Gush
 
     def persist_workflow(workflow)
       connection_pool.with do |redis|
-        redis.set("gush.workflows.#{workflow.id}", workflow.to_json)
+        redis.set("flush.workflows.#{workflow.id}", workflow.to_json)
       end
 
       workflow.jobs.each {|job| persist_job(workflow.id, job) }
@@ -107,7 +107,7 @@ module Gush
 
     def persist_job(workflow_id, job)
       connection_pool.with do |redis|
-        redis.set("gush.jobs.#{workflow_id}.#{job.name}", job.to_json)
+        redis.set("flush.jobs.#{workflow_id}.#{job.name}", job.to_json)
       end
     end
 
@@ -117,7 +117,7 @@ module Gush
       hypen = '-' if job_name_match.nil?
 
       keys = connection_pool.with do |redis|
-        redis.keys("gush.jobs.#{workflow_id}.#{job_id}#{hypen}*")
+        redis.keys("flush.jobs.#{workflow_id}.#{job_id}#{hypen}*")
       end
 
       return nil if keys.nil?
@@ -128,29 +128,29 @@ module Gush
 
       return nil if data.nil?
 
-      data = Gush::JSON.decode(data, symbolize_keys: true)
-      Gush::Job.from_hash(workflow, data)
+      data = Flush::JSON.decode(data, symbolize_keys: true)
+      Flush::Job.from_hash(workflow, data)
     end
 
     def destroy_workflow(workflow)
       connection_pool.with do |redis|
-        redis.del("gush.workflows.#{workflow.id}")
+        redis.del("flush.workflows.#{workflow.id}")
       end
       workflow.jobs.each {|job| destroy_job(workflow.id, job) }
     end
 
     def destroy_job(workflow_id, job)
       connection_pool.with do |redis|
-        redis.del("gush.jobs.#{workflow_id}.#{job.name}")
+        redis.del("flush.jobs.#{workflow_id}.#{job.name}")
       end
     end
 
     def worker_report(message)
-      report("gush.workers.status", message)
+      report("flush.workers.status", message)
     end
 
     def workflow_report(message)
-      report("gush.workflows.status", message)
+      report("flush.workflows.status", message)
     end
 
     def enqueue_job(workflow_id, job)
@@ -158,7 +158,7 @@ module Gush
       persist_job(workflow_id, job)
 
       sidekiq.push(
-        'class' => Gush::Worker,
+        'class' => Flush::Worker,
         'queue' => configuration.namespace,
         'args'  => [workflow_id, job.name]
       )
@@ -173,7 +173,7 @@ module Gush
       flow.id = hash[:id]
 
       (nodes || hash[:nodes]).each do |node|
-        flow.jobs << Gush::Job.from_hash(flow, node)
+        flow.jobs << Flush::Job.from_hash(flow, node)
       end
 
       flow
@@ -181,7 +181,7 @@ module Gush
 
     def report(key, message)
       connection_pool.with do |redis|
-        redis.publish(key, Gush::JSON.encode(message))
+        redis.publish(key, Flush::JSON.encode(message))
       end
     end
 

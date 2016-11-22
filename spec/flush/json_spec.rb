@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe Gush::JSON do
+describe Flush::JSON do
   subject { described_class }
 
   describe ".encode" do

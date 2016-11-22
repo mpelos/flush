@@ -3,17 +3,17 @@ lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
-  spec.name          = "gush"
+  spec.name          = "flush"
   spec.version       = "0.4.1"
   spec.authors       = ["Piotrek Okoński"]
   spec.email         = ["piotrek@okonski.org"]
   spec.summary       = "Fast and distributed workflow runner using only Sidekiq and Redis"
-  spec.description   = "Gush is a parallel workflow runner using only Redis as its message broker and Sidekiq for workers."
-  spec.homepage      = "https://github.com/pokonski/gush"
+  spec.description   = "Flush is a parallel workflow runner using only Redis as its message broker and Sidekiq for workers."
+  spec.homepage      = "https://github.com/pokonski/flush"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files -z`.split("\x0")
-  spec.executables   = "gush"
+  spec.executables   = "flush"
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ["lib"]
 

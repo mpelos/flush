@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe Gush::Graph do
+describe Flush::Graph do
   subject { described_class.new(TestWorkflow.create) }
   let(:filename) { "graph.png" }
 

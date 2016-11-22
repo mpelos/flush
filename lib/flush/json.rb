@@ -1,4 +1,4 @@
-module Gush
+module Flush
   class JSON
     def self.encode(data)
       MultiJson.dump(data)

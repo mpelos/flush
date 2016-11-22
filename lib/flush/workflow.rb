@@ -1,6 +1,6 @@
 require 'securerandom'
 
-module Gush
+module Flush
   class Workflow
     attr_accessor :id, :jobs, :stopped, :persisted, :arguments
 
@@ -16,7 +16,7 @@ module Gush
     end
 
     def self.find(id)
-      Gush::Client.new.find_workflow(id)
+      Flush::Client.new.find_workflow(id)
     end
 
     def self.create(*args)
@@ -26,7 +26,7 @@ module Gush
     end
 
     def continue
-      client = Gush::Client.new
+      client = Flush::Client.new
       failed_jobs = jobs.select(&:failed?)
 
       failed_jobs.each do |job|
@@ -173,7 +173,7 @@ module Gush
     end
 
     def to_json(options = {})
-      Gush::JSON.encode(to_hash)
+      Flush::JSON.encode(to_hash)
     end
 
     def self.descendants

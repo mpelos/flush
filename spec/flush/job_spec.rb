@@ -1,6 +1,6 @@
 require 'spec_helper'
 
-describe Gush::Job do
+describe Flush::Job do
 
   describe "#output" do
     it "saves output to output_payload" do
@@ -65,7 +65,7 @@ describe Gush::Job do
         job = described_class.new(double('flow'), name: "a-job", finished_at: 123, enqueued_at: 120)
         expected = {
           name: "a-job",
-          klass: "Gush::Job",
+          klass: "Flush::Job",
           incoming: [],
           outgoing: [],
           failed_at: nil,
@@ -85,7 +85,7 @@ describe Gush::Job do
       job = described_class.from_hash(
         double('flow'),
         {
-          klass: 'Gush::Job',
+          klass: 'Flush::Job',
           name: 'gob',
           incoming: ['a', 'b'],
           outgoing: ['c'],
@@ -97,8 +97,8 @@ describe Gush::Job do
       )
 
       expect(job.name).to eq('gob')
-      expect(job.class).to eq(Gush::Job)
-      expect(job.klass).to eq("Gush::Job")
+      expect(job.class).to eq(Flush::Job)
+      expect(job.klass).to eq("Flush::Job")
       expect(job.finished?).to eq(true)
       expect(job.failed?).to eq(true)
       expect(job.enqueued?).to eq(true)

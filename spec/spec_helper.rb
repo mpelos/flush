@@ -1,21 +1,21 @@
-require 'gush'
+require 'flush'
 require 'fakeredis'
 require 'sidekiq/testing'
 
 Sidekiq::Testing.fake!
 Sidekiq::Logging.logger = nil
 
-class Prepare < Gush::Job; end
-class FetchFirstJob < Gush::Job; end
-class FetchSecondJob < Gush::Job; end
-class PersistFirstJob < Gush::Job; end
-class PersistSecondJob < Gush::Job; end
-class NormalizeJob < Gush::Job; end
-class BobJob < Gush::Job; end
+class Prepare < Flush::Job; end
+class FetchFirstJob < Flush::Job; end
+class FetchSecondJob < Flush::Job; end
+class PersistFirstJob < Flush::Job; end
+class PersistSecondJob < Flush::Job; end
+class NormalizeJob < Flush::Job; end
+class BobJob < Flush::Job; end
 
-GUSHFILE  = Pathname.new(__FILE__).parent.join("Gushfile.rb")
+FLUSHFILE  = Pathname.new(__FILE__).parent.join("Flushfile.rb")
 
-class TestWorkflow < Gush::Workflow
+class TestWorkflow < Flush::Workflow
   def configure
     run Prepare
 
@@ -29,7 +29,7 @@ class TestWorkflow < Gush::Workflow
   end
 end
 
-class ParameterTestWorkflow < Gush::Workflow
+class ParameterTestWorkflow < Flush::Workflow
   def configure(param)
     run Prepare if param
   end
@@ -42,7 +42,7 @@ end
 
 REDIS_URL = "redis://localhost:6379/12"
 
-module GushHelpers
+module FlushHelpers
   def redis
     @redis ||= Redis.new(url: REDIS_URL)
   end
@@ -61,7 +61,7 @@ RSpec::Matchers.define :have_jobs do |flow, jobs|
     expected = jobs.map do |job|
       hash_including("args" => include(flow, job))
     end
-    expect(Gush::Worker.jobs).to match_array(expected)
+    expect(Flush::Worker.jobs).to match_array(expected)
   end
 
   failure_message do |actual|
@@ -70,17 +70,17 @@ RSpec::Matchers.define :have_jobs do |flow, jobs|
 end
 
 RSpec.configure do |config|
-  config.include GushHelpers
+  config.include FlushHelpers
 
   config.mock_with :rspec do |mocks|
     mocks.verify_partial_doubles = true
   end
 
   config.before(:each) do
-    Gush.configure do |config|
+    Flush.configure do |config|
       config.redis_url = REDIS_URL
       config.environment = 'test'
-      config.gushfile = GUSHFILE
+      config.flushfile = FLUSHFILE
     end
   end
 

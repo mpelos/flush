@@ -1,11 +1,11 @@
 require 'spec_helper'
 
-describe Gush::Worker do
+describe Flush::Worker do
   subject { described_class.new }
 
   let!(:workflow)   { TestWorkflow.create }
   let(:job)         { workflow.find_job("Prepare")  }
-  let(:config)      { Gush.configuration.to_json  }
+  let(:config)      { Flush.configuration.to_json  }
   let!(:client)     { double("client") }
 
   before :each do
