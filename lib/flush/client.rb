@@ -167,16 +167,44 @@ module Flush
     private
 
     def workflow_from_hash(hash, nodes = nil)
-      flow = hash[:klass].constantize.new *hash[:arguments]
-      flow.jobs = []
-      flow.stopped = hash.fetch(:stopped, false)
-      flow.id = hash[:id]
-
-      (nodes || hash[:nodes]).each do |node|
-        flow.jobs << Flush::Job.from_hash(flow, node)
+      workflow = begin
+        hash[:klass].constantize.new *hash[:arguments]
+      rescue NameError => e
+        anonymous_workflow.new *hash[:arguments]
       end
 
-      flow
+      workflow.jobs = []
+      workflow.stopped = hash.fetch(:stopped, false)
+      workflow.id = hash[:id]
+      workflow.scope = hash.fetch(:scope, {})
+      workflow.scope[:promises] = build_promises(workflow.scope.fetch(:promises, {}))
+
+      workflow.children = hash.fetch(:children_ids).map do |child_id|
+        child = find_workflow(child_id)
+        child.parent = workflow
+        child
+      end
+
+      workflow.resolve_scope_promises!
+
+      (nodes || hash[:nodes]).each do |node|
+        workflow.jobs << Flush::Job.from_hash(workflow, node)
+      end
+
+      workflow
+    end
+
+    def anonymous_workflow
+      Class.new(Workflow) do
+        def configure(**kwargs)
+        end
+      end
+    end
+
+    def build_promises(promises)
+      promises.each_with_object({}) do |(attr_name, params), acc|
+        acc[attr_name] = PromiseAttribute.new(attr_name)
+      end
     end
 
     def report(key, message)

@@ -1,17 +1,61 @@
 module Flush
   class Job
     attr_accessor :workflow_id, :incoming, :outgoing, :params,
-      :finished_at, :failed_at, :started_at, :enqueued_at, :payloads_hash, :klass
+      :finished_at, :failed_at, :started_at, :enqueued_at, :payloads_hash,
+      :klass, :workflow, :promises, :expose_params
     attr_reader :name, :output_payload, :params, :payloads
+    attr_writer :output
 
-    def initialize(workflow, opts = {})
+    def self.from_hash(workflow, hash)
+      promises = build_promises hash.fetch(:promises, {})
+      hash[:promises] = promises if promises.any?
+      job_params = hash.fetch(:params, {}).merge(promises)
+
+      job_workflow = workflow.find_in_descendants(hash[:workflow_id])
+      if job_workflow.nil?
+        fail JobWorkflowNotFoundInDescendants, "Step workflow not found in the hierarchy; " +
+          "job: #{name}, root_workflow_id: #{workflow.id}, seeked_workflow_id: #{hash[:workflow_id]}"
+      end
+
+      job = hash[:klass].constantize.new(**job_params.symbolize_keys)
+      job.setup(job_workflow, hash)
+      job.resolve_promises!
+      s = job
+      job
+    end
+
+    def setup(workflow, opts)
       @workflow = workflow
-      options = opts.dup
-      assign_variables(options)
+      @klass = self.class.name
+      @name = opts[:name]
+      @promises = opts[:promises] || {}
+      @incoming = opts[:incoming] || []
+      @outgoing = opts[:outgoing] || []
+      @failed_at = opts[:failed_at]
+      @finished_at = opts[:finished_at]
+      @started_at = opts[:started_at]
+      @enqueued_at = opts[:enqueued_at]
+      @params = opts[:params] || {}
+      @expose_params = opts[:expose_params] || []
+
+      self
+    end
+
+    def run
+      fail NotImplementedError
+    end
+
+    def done?
+      true
+    end
+
+    def output
+      @output ||= {}
     end
 
     def as_json
       {
+        workflow_id: workflow.id,
         name: name,
         klass: self.class.to_s,
         incoming: incoming,
@@ -21,7 +65,8 @@ module Flush
         started_at: started_at,
         failed_at: failed_at,
         params: params,
-        output_payload: output_payload
+        promises: promises,
+        expose_params: expose_params
       }
     end
 
@@ -29,12 +74,32 @@ module Flush
       Flush::JSON.encode(as_json)
     end
 
-    def self.from_hash(flow, hash)
-      hash[:klass].constantize.new(flow, hash)
+    def output
+      @output ||= {}
     end
 
-    def output(data)
-      @output_payload = data
+    def output=(output)
+      @output = output
+    end
+
+    def resolve_promises!
+      promises.each do |attr_name, promise|
+        unless promise.is_a? PromiseAttribute
+          fail AttributeNotAPromise, "One or more job attributes should be a promise;" +
+            "attribute: #{attr_name}, workflow: #{workflow.class}, job: #{name}"
+        end
+
+        attr_name = promise.attr_name.to_sym
+        attribute = workflow.scope[attr_name.to_sym]
+
+        next if attribute.nil?
+
+        public_send("#{attr_name}=", attribute)
+        params[attr_name] = attribute
+        promises.delete(attr_name)
+      end
+
+      self
     end
 
     def payloads
@@ -43,11 +108,22 @@ module Flush
       payload_h
     end
 
-    def work
+    def output_payload
+      expose_params.each_with_object({}) do |attr_name, acc|
+        attribute = output[attr_name.to_sym]
+
+        if attribute.nil?
+          fail ExposeParameterNotFoundInOutput, "The parameter that was suposed to be exposed in the workflow was " +
+            "not found in the step output; attribute: #{attr_name}, workflow: #{workflow.class}, job: #{name}"
+        end
+
+        acc[attr_name] = attribute
+      end
     end
 
     def start!
       @started_at = current_timestamp
+      on_start
     end
 
     def enqueue!
@@ -55,14 +131,36 @@ module Flush
       @started_at = nil
       @finished_at = nil
       @failed_at = nil
+      on_enqueue
     end
 
     def finish!
       @finished_at = current_timestamp
+      on_finish
     end
 
     def fail!
       @finished_at = @failed_at = current_timestamp
+      on_fail
+    end
+
+    def mark_as_performed
+      after_run
+    end
+
+    def on_start
+    end
+
+    def on_enqueue
+    end
+
+    def on_finish
+    end
+
+    def on_fail
+    end
+
+    def after_run
     end
 
     def enqueued?
@@ -103,7 +201,12 @@ module Flush
       incoming.empty?
     end
 
+    def workflow_id
+      workflow.id
+    end
+
     private
+
     def logger
       Sidekiq.logger
     end
@@ -112,17 +215,10 @@ module Flush
       Time.now.to_i
     end
 
-    def assign_variables(opts)
-      @name           = opts[:name]
-      @incoming       = opts[:incoming] || []
-      @outgoing       = opts[:outgoing] || []
-      @failed_at      = opts[:failed_at]
-      @finished_at    = opts[:finished_at]
-      @started_at     = opts[:started_at]
-      @enqueued_at    = opts[:enqueued_at]
-      @params         = opts[:params] || {}
-      @klass          = opts[:klass]
-      @output_payload = opts[:output_payload]
+    def self.build_promises(promises)
+      promises.each_with_object({}) do |(attr_name, params), acc|
+        acc[attr_name] = PromiseAttribute.new(attr_name)
+      end
     end
   end
 end

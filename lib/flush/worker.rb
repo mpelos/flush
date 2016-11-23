@@ -8,8 +8,6 @@ module Flush
     def perform(workflow_id, job_id)
       setup_job(workflow_id, job_id)
 
-      job.payloads_hash = incoming_payloads
-
       start = Time.now
       report(:started, start)
 
@@ -18,13 +16,16 @@ module Flush
 
       mark_as_started
       begin
-        job.work
+        job.run
+        job.mark_as_performed
+        wait_until_job_is_done!
       rescue Exception => error
         mark_as_failed
         report(:failed, start, error.message)
         raise error
       else
         mark_as_finished
+        update_workflow_scope
         report(:finished, start)
 
         enqueue_outgoing_jobs
@@ -51,6 +52,18 @@ module Flush
        payloads[job.klass.to_s] << {:id => job.name, :payload => job.output_payload}
       end
       payloads
+    end
+
+    def wait_until_job_is_done!
+      loop do
+        break if job.done?
+        sleep 0.5
+      end
+    end
+
+    def update_workflow_scope
+      job.workflow.merge_scope(job.output_payload)
+      client.persist_workflow(job.workflow)
     end
 
     def mark_as_finished

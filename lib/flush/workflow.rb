@@ -1,8 +1,9 @@
-require 'securerandom'
+require "securerandom"
 
 module Flush
   class Workflow
-    attr_accessor :id, :jobs, :stopped, :persisted, :arguments
+    attr_accessor :id, :jobs, :stopped, :persisted, :arguments, :parent, :scope
+    attr_writer :children
 
     def initialize(*args)
       @id = id
@@ -11,6 +12,15 @@ module Flush
       @persisted = false
       @stopped = false
       @arguments = args
+
+      @scope = @arguments.last.each_with_object({}) do |(attr_name, attribute), acc|
+        if attribute.is_a? PromiseAttribute
+          acc[:promises] ||= {}
+          acc[:promises][attr_name] = attribute
+        else
+          acc[attr_name] = attribute
+        end
+      end
 
       setup
     end
@@ -45,11 +55,13 @@ module Flush
       @stopped = true
     end
 
-    def start!
+    def start
+      persist!
       client.start_workflow(self)
     end
 
     def persist!
+      children.each { |child| child.persist! }
       client.persist_workflow(self)
     end
 
@@ -72,13 +84,17 @@ module Flush
     end
 
     def find_job(name)
-      match_data = /(?<klass>\w*[^-])-(?<identifier>.*)/.match(name.to_s)
-      if match_data.nil?
-        job = jobs.find { |node| node.class.to_s == name.to_s }
+      if parent
+        parent.find_job(name)
       else
-        job = jobs.find { |node| node.name.to_s == name.to_s }
+        match_data = /(?<klass>\w*[^-])-(?<identifier>.*)/.match(name.to_s)
+        if match_data.nil?
+          job = jobs.find { |node| node.class.to_s == name.to_s }
+        else
+          job = jobs.find { |node| node.name.to_s == name.to_s }
+        end
+        job
       end
-      job
     end
 
     def finished?
@@ -101,27 +117,101 @@ module Flush
       stopped
     end
 
-    def run(klass, opts = {})
-      options =
+    def merge_scope(hash)
+      scope.merge! hash
+    end
 
-      node = klass.new(self, {
-        name: client.next_free_job_id(id,klass.to_s),
-        params: opts.fetch(:params, {})
+    def find_in_descendants(workflow_id)
+      if id == workflow_id
+        self
+      elsif children.size > 0
+        children.find { |child| child.find_in_descendants(workflow_id) }
+      end
+    end
+
+    def run(klass, options = {})
+      # TODO: validates attribute accessor on requires
+      node_promises = Array.wrap(options.fetch(:requires, [])).each_with_object({}) do |attr_name, acc|
+        acc[attr_name.to_sym] = PromiseAttribute.new(attr_name)
+      end
+      node_params = options.fetch(:params, {}).each_with_object({}) do |(attr_name, attribute), acc|
+        if attribute.is_a? PromiseAttribute
+          node_promises[attr_name] = attribute
+        else
+          acc[attr_name] = attribute
+        end
+      end
+
+      begin
+        node = klass.new(**node_params.merge(node_promises))
+      rescue ArgumentError => error
+        absent_args = error.message.split(": ").last.split(", ")
+        raise MissingRequiredJobArguments,
+          "The job have required parameters that was not injected by the workflow;" +
+          "workflow: #{self.class.name}, job: #{klass.name}, absent_args: #{required_args}"
+      end
+
+      node.setup(self, {
+        name: client.next_free_job_id(id, klass.to_s),
+        params: node_params,
+        promises: node_promises,
+        expose_params: Array.wrap(options.fetch(:exposes, [])).map(&:to_sym)
       })
 
+      add_dependency(from: jobs.last.name.to_s, to: node.name.to_s) if jobs.any?
       jobs << node
 
-      deps_after = [*opts[:after]]
-      deps_after.each do |dep|
-        @dependencies << {from: dep.to_s, to: node.name.to_s }
-      end
-
-      deps_before = [*opts[:before]]
-      deps_before.each do |dep|
-        @dependencies << {from: node.name.to_s, to: dep.to_s }
-      end
-
       node.name
+    end
+
+    def compose(klass, options = {})
+      params = options.fetch(:params, {})
+      promises = Array.wrap(options.fetch(:requires, [])).each_with_object({}) do |attr_name, acc|
+        acc[attr_name.to_sym] = PromiseAttribute.new(attr_name)
+      end
+
+      composition = klass.new(**params.merge!(promises))
+      composition.parent = self
+      children << composition
+
+      composition.jobs.each do |job|
+        job.incoming = []
+        job.outgoing = []
+        add_dependency(from: jobs.last.name.to_s, to: job.name.to_s) if jobs.any?
+        jobs << job
+      end
+
+      composition.jobs.map(&:name)
+    end
+
+    def workflow(options = {}, &block)
+      return unless block_given?
+
+      klass = Class.new(Workflow) do
+        define_method(:configure) do |**kwargs|
+          instance_eval &block
+        end
+      end
+
+      compose klass, options
+    end
+
+    def resolve_scope_promises!
+      return scope if parent.nil?
+
+      scope.fetch(:promises, {}).each do |attr_name, promise|
+        unless promise.is_a? PromiseAttribute
+          fail AttributeNotAPromise, "One or more workflow attributes should be a promise;" +
+            "attribute: #{attr_name}, workflow: #{self.class}, workflow_id: #{id}"
+        end
+
+        if parent.scope[attr_name]
+          scope[attr_name] = parent.scope[attr_name]
+          scope[:promises].delete attr_name
+        end
+      end
+
+      scope
     end
 
     def reload
@@ -162,6 +252,8 @@ module Flush
         id: id,
         arguments: @arguments,
         total: jobs.count,
+        children_ids: children.map(&:id),
+        scope: scope,
         finished: jobs.count(&:finished?),
         klass: name,
         jobs: jobs.map(&:as_json),
@@ -184,15 +276,19 @@ module Flush
       @id ||= client.next_free_workflow_id
     end
 
+    def children
+      @children ||= []
+    end
+
+    def client
+      @client ||= Client.new
+    end
+
     private
 
     def setup
       configure(*@arguments)
       resolve_dependencies
-    end
-
-    def client
-      @client ||= Client.new
     end
 
     def first_job
@@ -201,6 +297,10 @@ module Flush
 
     def last_job
       jobs.max_by{ |n| n.finished_at || 0 } if finished?
+    end
+
+    def add_dependency(from:, to:)
+      @dependencies << { from: from, to: to }
     end
   end
 end
