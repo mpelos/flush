@@ -16,9 +16,13 @@ module Flush
 
       mark_as_started
       begin
-        job.run
-        job.mark_as_performed
-        wait_until_job_is_done!
+        if job.should_run?
+          job.run
+          job.mark_as_performed
+          wait_until_job_is_done!
+        else
+          job.mark_as_skipped
+        end
       rescue Exception => error
         mark_as_failed
         report(:failed, start, error.message)
