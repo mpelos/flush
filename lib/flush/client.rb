@@ -2,13 +2,11 @@ module Flush
   class Client
     attr_reader :configuration, :sidekiq
 
-    def initialize(config = Flush.configuration)
-      @configuration = config
+    def initialize
       @sidekiq = build_sidekiq
     end
 
     def configure
-      yield configuration
       @sidekiq = build_sidekiq
     end
 
@@ -156,12 +154,7 @@ module Flush
     def enqueue_job(workflow_id, job)
       job.enqueue!
       persist_job(workflow_id, job)
-
-      sidekiq.push(
-        'class' => Flush::Worker,
-        'queue' => configuration.namespace,
-        'args'  => [workflow_id, job.name]
-      )
+      Flush::Worker.perform_async workflow_id, job.name
     end
 
     private
@@ -213,17 +206,16 @@ module Flush
       end
     end
 
-
     def build_sidekiq
       Sidekiq::Client.new(connection_pool)
     end
 
     def build_redis
-      Redis.new(url: configuration.redis_url)
+      Sidekiq.redis { |client| client }
     end
 
     def connection_pool
-      @connection_pool ||= ConnectionPool.new(size: configuration.concurrency, timeout: 1) { build_redis }
+      @connection_pool ||= ConnectionPool.new(size: 5, timeout: 1) { build_redis }
     end
   end
 end

@@ -10,7 +10,7 @@ module Flush
       self.concurrency = hash.fetch(:concurrency, 5)
       self.namespace   = hash.fetch(:namespace, 'flush')
       self.redis_url   = hash.fetch(:redis_url, 'redis://localhost:6379')
-      self.flushfile    = hash.fetch(:flushfile, 'Flushfile.rb')
+      self.flushfile   = hash.fetch(:flushfile, 'Flushfile.rb')
       self.environment = hash.fetch(:environment, 'development')
     end
 

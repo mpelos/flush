@@ -36,7 +36,7 @@ module Flush
     attr_reader :client, :workflow, :job
 
     def client
-      @client ||= Flush::Client.new(Flush.configuration)
+      @client ||= Flush::Client.new
     end
 
     def setup_job(workflow_id, job_id)

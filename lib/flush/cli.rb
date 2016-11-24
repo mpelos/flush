@@ -127,7 +127,7 @@ module Flush
     end
 
     def flushfile
-      Flush.configuration.flushfile
+      Flush::Configuration.new.flushfile
     end
 
     def load_flushfile
