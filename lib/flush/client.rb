@@ -3,11 +3,9 @@ module Flush
     attr_reader :configuration, :sidekiq
 
     def initialize
-      @sidekiq = build_sidekiq
     end
 
     def configure
-      @sidekiq = build_sidekiq
     end
 
     def create_workflow(name)
@@ -45,7 +43,7 @@ module Flush
       loop do
         id = SecureRandom.uuid
         job_identifier = "#{job_klass}-#{id}"
-        available = connection_pool.with do |redis|
+        available = Sidekiq.redis do |redis|
           !redis.exists("flush.jobs.#{workflow_id}.#{job_identifier}")
         end
 
@@ -59,7 +57,7 @@ module Flush
       id = nil
       loop do
         id = SecureRandom.uuid
-        available = connection_pool.with do |redis|
+        available = Sidekiq.redis do |redis|
           !redis.exists("flush.workflow.#{id}")
         end
 
@@ -70,7 +68,7 @@ module Flush
     end
 
     def all_workflows
-      connection_pool.with do |redis|
+      Sidekiq.redis do |redis|
         redis.keys("flush.workflows.*").map do |key|
           id = key.sub("flush.workflows.", "")
           find_workflow(id)
@@ -79,7 +77,7 @@ module Flush
     end
 
     def find_workflow(id)
-      connection_pool.with do |redis|
+      Sidekiq.redis do |redis|
         data = redis.get("flush.workflows.#{id}")
 
         unless data.nil?
@@ -94,7 +92,7 @@ module Flush
     end
 
     def persist_workflow(workflow)
-      connection_pool.with do |redis|
+      Sidekiq.redis do |redis|
         redis.set("flush.workflows.#{workflow.id}", workflow.to_json)
       end
 
@@ -104,7 +102,7 @@ module Flush
     end
 
     def persist_job(workflow_id, job)
-      connection_pool.with do |redis|
+      Sidekiq.redis do |redis|
         redis.set("flush.jobs.#{workflow_id}.#{job.name}", job.to_json)
       end
     end
@@ -114,13 +112,13 @@ module Flush
       job_name_match = /(?<klass>\w*[^-])-(?<identifier>.*)/.match(job_id)
       hypen = '-' if job_name_match.nil?
 
-      keys = connection_pool.with do |redis|
+      keys = Sidekiq.redis do |redis|
         redis.keys("flush.jobs.#{workflow_id}.#{job_id}#{hypen}*")
       end
 
       return nil if keys.nil?
 
-      data = connection_pool.with do |redis|
+      data = Sidekiq.redis do |redis|
         redis.get(keys.first)
       end
 
@@ -131,14 +129,14 @@ module Flush
     end
 
     def destroy_workflow(workflow)
-      connection_pool.with do |redis|
+      Sidekiq.redis do |redis|
         redis.del("flush.workflows.#{workflow.id}")
       end
       workflow.jobs.each {|job| destroy_job(workflow.id, job) }
     end
 
     def destroy_job(workflow_id, job)
-      connection_pool.with do |redis|
+      Sidekiq.redis do |redis|
         redis.del("flush.jobs.#{workflow_id}.#{job.name}")
       end
     end
@@ -201,21 +199,9 @@ module Flush
     end
 
     def report(key, message)
-      connection_pool.with do |redis|
+      Sidekiq.redis do |redis|
         redis.publish(key, Flush::JSON.encode(message))
       end
-    end
-
-    def build_sidekiq
-      Sidekiq::Client.new(connection_pool)
-    end
-
-    def build_redis
-      Sidekiq.redis { |client| client }
-    end
-
-    def connection_pool
-      @connection_pool ||= ConnectionPool.new(size: 5, timeout: 1) { build_redis }
     end
   end
 end
