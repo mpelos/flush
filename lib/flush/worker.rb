@@ -19,10 +19,11 @@ module Flush
         if job.should_run?
           job.run
           job.mark_as_performed
-          wait_until_job_is_done!
         else
           job.mark_as_skipped
         end
+
+        wait_until_job_is_done!
       rescue Exception => error
         mark_as_failed
         report(:failed, start, error.message)
@@ -61,7 +62,7 @@ module Flush
     def wait_until_job_is_done!
       loop do
         break if job.done?
-        sleep 0.5
+        sleep 5
       end
     end
 
