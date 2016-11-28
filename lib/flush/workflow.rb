@@ -117,6 +117,10 @@ module Flush
       stopped
     end
 
+    def succeeded?
+      jobs.all?(&:finished?) && jobs.none?(&:failed?)
+    end
+
     def merge_scope(hash)
       scope.merge! hash
     end
