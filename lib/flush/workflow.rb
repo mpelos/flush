@@ -147,8 +147,8 @@ module Flush
       rescue ArgumentError => error
         absent_args = error.message.split(": ").last.split(", ")
         raise MissingRequiredJobArguments,
-          "The job have required parameters that was not injected by the workflow;" +
-          "workflow: #{self.class.name}, job: #{klass.name}, absent_args: #{required_args}"
+          "The job requires parameters that was not injected by the workflow; " +
+          "workflow: #{self.class.name || "AnonymousWorkflow"}, job: #{klass.name}, absent_args: #{absent_args}"
       end
 
       node.setup(self, {
