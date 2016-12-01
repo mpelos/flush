@@ -13,12 +13,14 @@ module Flush
       @stopped = false
       @arguments = args
 
-      @scope = @arguments.last.each_with_object({}) do |(attr_name, attribute), acc|
-        if attribute.is_a? PromiseAttribute
-          acc[:promises] ||= {}
-          acc[:promises][attr_name] = attribute
-        else
-          acc[attr_name] = attribute
+      if @arguments.any?
+        @scope = @arguments.last.each_with_object({}) do |(attr_name, attribute), acc|
+          if attribute.is_a? PromiseAttribute
+            acc[:promises] ||= {}
+            acc[:promises][attr_name] = attribute
+          else
+            acc[attr_name] = attribute
+          end
         end
       end
 
