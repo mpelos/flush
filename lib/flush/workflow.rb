@@ -35,12 +35,12 @@ module Flush
       flow
     end
 
-    def continue
+    def retry
       client = Flush::Client.new
       failed_jobs = jobs.select(&:failed?)
 
       failed_jobs.each do |job|
-        client.enqueue_job(id, job)
+        client.retry_job(id, job)
       end
     end
 

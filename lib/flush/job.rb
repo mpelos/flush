@@ -2,7 +2,7 @@ module Flush
   class Job
     attr_accessor :workflow_id, :incoming, :outgoing, :params,
       :finished_at, :failed_at, :started_at, :enqueued_at, :skipped_at,
-      :payloads_hash, :klass, :workflow, :promises, :expose_params
+      :retry_count, :payloads_hash, :klass, :workflow, :promises, :expose_params
     attr_reader :name, :output_payload, :params, :payloads
     attr_writer :output
 
@@ -20,7 +20,6 @@ module Flush
       job = hash[:klass].constantize.new(**job_params.symbolize_keys)
       job.setup(job_workflow, hash)
       job.resolve_promises!
-      s = job
       job
     end
 
@@ -36,6 +35,7 @@ module Flush
       @started_at = opts[:started_at]
       @enqueued_at = opts[:enqueued_at]
       @skipped_at = opts[:enqueued_at]
+      @retry_count = opts[:retry_count] || 0
       @params = opts[:params] || {}
       @expose_params = opts[:expose_params] || []
 
@@ -70,6 +70,7 @@ module Flush
         started_at: started_at,
         failed_at: failed_at,
         skipped_at: skipped_at,
+        retry_count: retry_count,
         params: params,
         promises: promises,
         expose_params: expose_params
@@ -141,6 +142,12 @@ module Flush
       on_enqueue
     end
 
+    def requeue!
+      @enqueued_at = current_timestamp
+      @failed_at = nil
+      on_enqueue
+    end
+
     def finish!
       @finished_at = current_timestamp
       on_finish
@@ -160,6 +167,11 @@ module Flush
       on_skipping
     end
 
+    def mark_as_retried
+      @retry_count = @retry_count.to_i + 1
+      on_retry
+    end
+
     def on_start
     end
 
@@ -176,6 +188,9 @@ module Flush
     end
 
     def on_skipping
+    end
+
+    def on_retry
     end
 
     def enqueued?

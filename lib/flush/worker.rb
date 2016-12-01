@@ -5,7 +5,7 @@ module Flush
     include ::Sidekiq::Worker
     sidekiq_options retry: false
 
-    def perform(workflow_id, job_id)
+    def perform(workflow_id, job_id, retrying = false)
       setup_job(workflow_id, job_id)
 
       start = Time.now
@@ -16,6 +16,8 @@ module Flush
 
       mark_as_started
       begin
+        job.mark_as_retried if retrying
+
         if job.should_run?
           job.run
           job.mark_as_performed
@@ -24,17 +26,17 @@ module Flush
         end
 
         wait_until_job_is_done!
+        mark_as_finished
       rescue Exception => error
         mark_as_failed
         report(:failed, start, error.message)
         raise error
-      else
-        mark_as_finished
-        update_workflow_scope
-        report(:finished, start)
-
-        enqueue_outgoing_jobs
       end
+
+      update_workflow_scope
+      report(:finished, start)
+
+      enqueue_outgoing_jobs
     end
 
     private

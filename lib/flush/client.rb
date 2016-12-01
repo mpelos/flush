@@ -155,6 +155,12 @@ module Flush
       Flush::Worker.perform_async workflow_id, job.name
     end
 
+    def retry_job(workflow_id, job)
+      job.requeue!
+      persist_job(workflow_id, job)
+      Flush::Worker.perform_async workflow_id, job.name, true
+    end
+
     private
 
     def workflow_from_hash(hash, nodes = nil)
