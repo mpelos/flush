@@ -64,6 +64,7 @@ module Flush
     def wait_until_job_is_done!
       loop do
         break if job.done?
+        job.on_done_checking
         sleep 5
       end
     end

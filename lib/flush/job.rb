@@ -192,6 +192,9 @@ module Flush
     def on_retry
     end
 
+    def on_done_checking
+    end
+
     def enqueued?
       !enqueued_at.nil?
     end
