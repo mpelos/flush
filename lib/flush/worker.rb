@@ -14,8 +14,8 @@ module Flush
       failed = false
       error = nil
 
-      mark_as_started
       begin
+        mark_as_started
         job.mark_as_retried if retrying
 
         if job.should_run?
@@ -27,13 +27,13 @@ module Flush
 
         wait_until_job_is_done!
         mark_as_finished
+        update_workflow_scope
       rescue Exception => error
         mark_as_failed
         report(:failed, start, error.message)
         raise error
       end
 
-      update_workflow_scope
       report(:finished, start)
 
       enqueue_outgoing_jobs
