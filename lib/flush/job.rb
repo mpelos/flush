@@ -103,7 +103,6 @@ module Flush
 
         public_send("#{attr_name}=", attribute)
         params[attr_name] = attribute
-        promises.delete(attr_name)
       end
 
       self
