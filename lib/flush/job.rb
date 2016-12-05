@@ -116,7 +116,7 @@ module Flush
 
     def output_payload
       expose_params.each_with_object({}) do |attr_name, acc|
-        attribute = output[attr_name.to_sym]
+        attribute = output[attr_name.to_sym] || output[attr_name.to_s]
 
         if attribute.nil?
           fail ExposeParameterNotFoundInOutput, "The parameter that was suposed to be exposed in the workflow was " +
