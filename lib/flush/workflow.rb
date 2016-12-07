@@ -232,6 +232,10 @@ module Flush
       jobs.select(&:has_no_dependencies?)
     end
 
+    def current_jobs
+      initial_jobs.flat_map { |job| find_first_pending_jobs(job) }
+    end
+
     def status
       case
         when failed?
@@ -311,6 +315,16 @@ module Flush
 
     def add_dependency(from:, to:)
       @dependencies << { from: from, to: to }
+    end
+
+    def find_first_pending_jobs(initial_job)
+      return [initial_job] if !initial_job.succeeded?
+
+      job_names = initial_job.outgoing
+      jobs = job_names.map { |job_name| find_job(job_name) }
+      jobs.flat_map do |job|
+        find_first_pending_jobs(job)
+      end
     end
   end
 end
