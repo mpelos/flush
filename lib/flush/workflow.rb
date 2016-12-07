@@ -151,10 +151,14 @@ module Flush
       begin
         node = klass.new(**node_params.merge(node_promises))
       rescue ArgumentError => error
-        absent_args = error.message.split(": ").last.split(", ")
-        raise MissingRequiredJobArguments,
-          "The job requires parameters that was not injected by the workflow; " +
-          "workflow: #{self.class.name || "AnonymousWorkflow"}, job: #{klass.name}, absent_args: #{absent_args}"
+        if error.message.include? "missing keywords:"
+          absent_args = error.message.split(": ").last.split(", ")
+          raise MissingRequiredJobArguments,
+            "The job requires parameters that was not injected by the workflow; " +
+            "workflow: #{self.class.name || "AnonymousWorkflow"}, job: #{klass.name}, absent_args: #{absent_args}"
+        else
+          raise error
+        end
       end
 
       node.setup(self, {
