@@ -14,29 +14,31 @@ module Flush
       failed = false
       error = nil
 
-      begin
-        mark_as_started
-        job.mark_as_retried if retrying
+      mark_as_started
+      job.mark_as_retried if retrying
 
-        if job.should_run?
-          job.run
-          job.mark_as_performed
-        else
-          job.mark_as_skipped
-        end
-
-        wait_until_job_is_done!
-        mark_as_finished
-        update_workflow_scope
-      rescue Exception => error
-        mark_as_failed
-        report(:failed, start, error.message)
-        raise error
+      if job.should_run?
+        job.run
+        job.mark_as_performed
+      else
+        job.mark_as_skipped
       end
+
+      wait_until_job_is_done!
+      mark_as_finished
+      update_workflow_scope
 
       report(:finished, start)
 
-      enqueue_outgoing_jobs
+      if workflow.finished?
+        client.finish_workflow(workflow)
+      else
+        enqueue_outgoing_jobs
+      end
+    rescue Exception => error
+      mark_as_failed
+      report(:failed, start, error.message)
+      raise error
     end
 
     private
@@ -81,6 +83,7 @@ module Flush
 
     def mark_as_failed
       job.fail!
+      client.fail_workflow(workflow)
       client.persist_job(workflow.id, job)
     end
 

@@ -2,7 +2,7 @@ require "securerandom"
 
 module Flush
   class Workflow
-    attr_accessor :id, :jobs, :stopped, :persisted, :arguments, :parent, :scope
+    attr_accessor :id, :jobs, :stopped, :persisted, :arguments, :parent, :scope, :enqueued_at
     attr_writer :children
 
     def initialize(*args)
@@ -25,10 +25,15 @@ module Flush
       end
 
       setup
+      after_initialize(*@arguments)
+    end
+
+    def self.flush_options(options = {})
+      @@queue = options[:queue]
     end
 
     def self.find(id)
-      Flush::Client.new.find_workflow(id)
+      client.find_workflow(id)
     end
 
     def self.create(*args)
@@ -37,13 +42,25 @@ module Flush
       flow
     end
 
-    def retry
-      client = Flush::Client.new
-      failed_jobs = jobs.select(&:failed?)
+    def after_initialize(*args)
+    end
 
-      failed_jobs.each do |job|
-        client.retry_job(id, job)
-      end
+    def on_enqueue
+    end
+
+    def on_fail
+    end
+
+    def on_success
+    end
+
+    def queue
+      @@queue ||= nil
+      @@queue
+    end
+
+    def retry
+      client.retry_workflow(self)
     end
 
     def save
@@ -53,13 +70,10 @@ module Flush
     def configure(*args)
     end
 
-    def mark_as_stopped
-      @stopped = true
-    end
-
     def start
       persist!
       client.start_workflow(self)
+      id
     end
 
     def persist!
@@ -73,6 +87,24 @@ module Flush
 
     def mark_as_started
       @stopped = false
+      self.enqueued_at = nil
+    end
+
+    def mark_as_stopped
+      @stopped = true
+    end
+
+    def mark_as_enqueued
+      self.enqueued_at = current_timestamp
+      on_enqueue
+    end
+
+    def mark_as_finished
+      on_success
+    end
+
+    def mark_as_failed
+      on_fail
     end
 
     def resolve_dependencies
@@ -99,8 +131,12 @@ module Flush
       end
     end
 
-    def finished?
-      jobs.all?(&:finished?)
+    def pending?
+      !started_at? && !failed?
+    end
+
+    def enqueued?
+      !!enqueued_at
     end
 
     def started?
@@ -117,6 +153,10 @@ module Flush
 
     def stopped?
       stopped
+    end
+
+    def finished?
+      jobs.all?(&:finished?)
     end
 
     def succeeded?
@@ -246,6 +286,8 @@ module Flush
           :finished
         when stopped?
           :stopped
+        when enqueued?
+          :enqueued
         else
           :running
       end
@@ -274,7 +316,8 @@ module Flush
         status: status,
         stopped: stopped,
         started_at: started_at,
-        finished_at: finished_at
+        finished_at: finished_at,
+        enqueued_at: enqueued_at
       }
     end
 
@@ -325,6 +368,10 @@ module Flush
       jobs.flat_map do |job|
         find_first_pending_jobs(job)
       end
+    end
+
+    def current_timestamp
+      Time.now.to_i
     end
   end
 end

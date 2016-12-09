@@ -149,7 +149,7 @@ module Flush
 
     def finish!
       @finished_at = current_timestamp
-      on_finish
+      on_success
     end
 
     def fail!
@@ -177,7 +177,7 @@ module Flush
     def on_enqueue
     end
 
-    def on_finish
+    def on_success
     end
 
     def on_fail
