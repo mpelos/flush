@@ -177,7 +177,7 @@ module Flush
 
     def run(klass, options = {})
       # TODO: validates attribute accessor on requires
-      node_promises = Array.wrap(options.fetch(:requires, [])).each_with_object({}) do |attr_name, acc|
+      node_promises = array_wrap(options.fetch(:requires, [])).each_with_object({}) do |attr_name, acc|
         acc[attr_name.to_sym] = PromiseAttribute.new(attr_name)
       end
       node_params = options.fetch(:params, {}).each_with_object({}) do |(attr_name, attribute), acc|
@@ -205,7 +205,7 @@ module Flush
         name: client.next_free_job_id(id, klass.to_s),
         params: node_params,
         promises: node_promises,
-        expose_params: Array.wrap(options.fetch(:exposes, [])).map(&:to_sym)
+        expose_params: array_wrap(options.fetch(:exposes, [])).map(&:to_sym)
       })
 
       add_dependency(from: jobs.last.name.to_s, to: node.name.to_s) if jobs.any?
@@ -216,7 +216,7 @@ module Flush
 
     def compose(klass, options = {})
       params = options.fetch(:params, {})
-      promises = Array.wrap(options.fetch(:requires, [])).each_with_object({}) do |attr_name, acc|
+      promises = array_wrap(options.fetch(:requires, [])).each_with_object({}) do |attr_name, acc|
         acc[attr_name.to_sym] = PromiseAttribute.new(attr_name)
       end
 
@@ -372,6 +372,10 @@ module Flush
 
     def current_timestamp
       Time.now.to_i
+    end
+
+    def array_wrap(object)
+      object.is_a?(Array) ? object : [object]
     end
   end
 end
