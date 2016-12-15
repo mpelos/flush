@@ -141,12 +141,6 @@ module Flush
       on_enqueue
     end
 
-    def requeue!
-      @enqueued_at = current_timestamp
-      @failed_at = nil
-      on_enqueue
-    end
-
     def finish!
       @finished_at = current_timestamp
       on_success

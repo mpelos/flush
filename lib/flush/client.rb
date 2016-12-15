@@ -48,7 +48,7 @@ module Flush
         failed_jobs = workflow.jobs.select(&:failed?)
 
         failed_jobs.each do |job|
-          retry_job(workflow.id, job)
+          enqueue_job(workflow.id, job, true)
         end
       end
     end
@@ -250,16 +250,10 @@ module Flush
       report("flush.workflows.status", message)
     end
 
-    def enqueue_job(workflow_id, job)
+    def enqueue_job(workflow_id, job, retrying = false)
       job.enqueue!
       persist_job(workflow_id, job)
-      Flush::Worker.perform_async workflow_id, job.name
-    end
-
-    def retry_job(workflow_id, job)
-      job.requeue!
-      persist_job(workflow_id, job)
-      Flush::Worker.perform_async workflow_id, job.name, true
+      Flush::Worker.perform_async workflow_id, job.name, retrying
     end
 
     private
