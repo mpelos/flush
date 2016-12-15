@@ -220,7 +220,7 @@ module Flush
         acc[attr_name.to_sym] = PromiseAttribute.new(attr_name)
       end
 
-      composition = klass.new(**params.merge!(promises))
+      composition = klass.new(**params.merge(promises))
       composition.parent = self
       children << composition
 
@@ -257,7 +257,7 @@ module Flush
 
         if parent.scope[attr_name]
           scope[attr_name] = parent.scope[attr_name]
-          scope[:promises].delete attr_name
+          send("#{attr_name}=", scope[attr_name]) if respond_to?("#{attr_name}=")
         end
       end
 

@@ -141,7 +141,7 @@ module Flush
       end
     end
 
-    def find_workflow(id)
+    def find_workflow(id, parent = nil)
       Sidekiq.redis do |redis|
         data = redis.get("flush.workflows.#{id}")
 
@@ -149,7 +149,7 @@ module Flush
           hash = Flush::JSON.decode(data, symbolize_keys: true)
           keys = redis.keys("flush.jobs.#{id}.*")
           nodes = redis.mget(*keys).map { |json| Flush::JSON.decode(json, symbolize_keys: true) }
-          workflow_from_hash(hash, nodes)
+          workflow_from_hash(hash, nodes, parent)
         else
           raise WorkflowNotFound.new("Workflow with given id doesn't exist")
         end
@@ -258,7 +258,7 @@ module Flush
 
     private
 
-    def workflow_from_hash(hash, nodes = nil)
+    def workflow_from_hash(hash, nodes = nil, parent = nil)
       workflow = begin
         hash[:klass].constantize.new *hash[:arguments]
       rescue NameError => e
@@ -266,19 +266,18 @@ module Flush
       end
 
       workflow.jobs = []
+      workflow.parent = parent
       workflow.stopped = hash.fetch(:stopped, false)
       workflow.id = hash[:id]
       workflow.enqueued_at = hash[:enqueued_at]
       workflow.scope = hash.fetch(:scope, {})
       workflow.scope[:promises] = build_promises(workflow.scope.fetch(:promises, {}))
+      workflow.resolve_scope_promises!
 
       workflow.children = hash.fetch(:children_ids).map do |child_id|
-        child = find_workflow(child_id)
-        child.parent = workflow
+        child = find_workflow(child_id, workflow)
         child
       end
-
-      workflow.resolve_scope_promises!
 
       (nodes || hash[:nodes]).each do |node|
         workflow.jobs << Flush::Job.from_hash(workflow, node)
