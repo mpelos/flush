@@ -270,6 +270,7 @@ module Flush
       workflow.stopped = hash.fetch(:stopped, false)
       workflow.id = hash[:id]
       workflow.enqueued_at = hash[:enqueued_at]
+      workflow.expose_params = hash[:expose_params]
       workflow.scope = hash.fetch(:scope, {})
       workflow.scope[:promises] = build_promises(workflow.scope.fetch(:promises, {}))
       workflow.resolve_scope_promises!

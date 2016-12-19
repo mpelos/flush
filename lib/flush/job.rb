@@ -138,6 +138,7 @@ module Flush
       @finished_at = nil
       @failed_at = nil
       @skipped_at = nil
+      # TODO: validate when there is no promises in construction
       on_enqueue
     end
 

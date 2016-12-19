@@ -2,13 +2,14 @@ require "securerandom"
 
 module Flush
   class Workflow
-    attr_accessor :id, :jobs, :stopped, :persisted, :arguments, :parent, :scope, :enqueued_at
+    attr_accessor :id, :jobs, :stopped, :persisted, :arguments, :parent, :scope, :enqueued_at, :expose_params
     attr_writer :children
 
     def initialize(*args)
       @id = id
       @jobs = []
       @dependencies = []
+      @expose_params = []
       @persisted = false
       @stopped = false
       @arguments = args
@@ -165,6 +166,11 @@ module Flush
 
     def merge_scope(hash)
       scope.merge! hash
+
+      if parent && (expose_params & hash.keys).any?
+        parent_params = hash.select { |attr_name, _| expose_params.include?(attr_name) }
+        parent.merge_scope(parent_params)
+      end
     end
 
     def find_in_descendants(workflow_id)
@@ -223,6 +229,7 @@ module Flush
       composition = klass.new(**params.merge(promises))
       composition.parent = self
       children << composition
+      composition.expose_params = array_wrap(options.fetch(:exposes, [])).map(&:to_sym)
 
       composition.jobs.each do |job|
         job.incoming = []
@@ -309,6 +316,7 @@ module Flush
         arguments: @arguments,
         total: jobs.count,
         children_ids: children.map(&:id),
+        expose_params: expose_params,
         scope: scope,
         finished: jobs.count(&:finished?),
         klass: name,
