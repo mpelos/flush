@@ -97,10 +97,10 @@ module Flush
         end
 
         attr_name = promise.attr_name.to_sym
+
+        next unless workflow.scope.key? attr_name.to_sym
+
         attribute = workflow.scope[attr_name.to_sym]
-
-        next if attribute.nil?
-
         public_send("#{attr_name}=", attribute)
         params[attr_name] = attribute
       end

@@ -262,7 +262,7 @@ module Flush
             "attribute: #{attr_name}, workflow: #{self.class}, workflow_id: #{id}"
         end
 
-        if parent.scope[attr_name]
+        if parent.scope.key? attr_name
           scope[attr_name] = parent.scope[attr_name]
           send("#{attr_name}=", scope[attr_name]) if respond_to?("#{attr_name}=")
         end
