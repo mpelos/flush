@@ -1,5 +1,5 @@
 # Flush
 
-Flush Fork with a lot of changes =P
+Gush Fork with a lot of changes =P
 
 Under development!
