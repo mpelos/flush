@@ -49,6 +49,9 @@ module Flush
     def on_enqueue
     end
 
+    def on_start
+    end
+
     def on_fail
     end
 
@@ -89,6 +92,7 @@ module Flush
     def mark_as_started
       @stopped = false
       self.enqueued_at = nil
+      on_start
     end
 
     def mark_as_stopped
