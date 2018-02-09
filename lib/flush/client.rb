@@ -260,6 +260,7 @@ module Flush
 
     def workflow_from_hash(hash, nodes = nil, parent = nil)
       workflow = begin
+        hash[:arguments].last.merge!(id: hash[:id])
         hash[:klass].constantize.new *hash[:arguments]
       rescue NameError => e
         anonymous_workflow.new *hash[:arguments]

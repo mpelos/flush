@@ -6,7 +6,14 @@ module Flush
     attr_writer :children
 
     def initialize(*args)
-      @id = id
+      id = args && args.last[:id]
+      if id
+        @id = id
+        args.last.delete(:id)
+      else
+        @id = self.id
+      end
+
       @jobs = []
       @dependencies = []
       @expose_params = []
