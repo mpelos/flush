@@ -25,8 +25,8 @@ module Flush
       end
 
       wait_until_job_is_done!
-      mark_as_finished
       update_workflow_scope
+      mark_as_finished
 
       report(:finished, start)
 
@@ -36,6 +36,7 @@ module Flush
         enqueue_outgoing_jobs
       end
     rescue Exception => error
+      update_workflow_scope
       mark_as_failed
       report(:failed, start, error.message)
       raise error
@@ -72,7 +73,7 @@ module Flush
     end
 
     def update_workflow_scope
-      job.workflow.merge_scope(job.output_payload)
+      job.workflow.merge_scope(job.output_payload.symbolize_keys)
       client.persist_workflow(job.workflow)
     end
 
