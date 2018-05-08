@@ -117,12 +117,6 @@ module Flush
     def output_payload
       expose_params.each_with_object({}) do |attr_name, acc|
         attribute = output[attr_name.to_sym] || output[attr_name.to_s]
-
-        if attribute.nil?
-          fail ExposeParameterNotFoundInOutput, "The parameter that was suposed to be exposed in the workflow was " +
-            "not found in the step output; attribute: #{attr_name}, workflow: #{workflow.class}, job: #{name}"
-        end
-
         acc[attr_name] = attribute
       end
     end

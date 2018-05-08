@@ -36,6 +36,7 @@ module Flush
         enqueue_outgoing_jobs
       end
     rescue Exception => error
+      update_workflow_scope
       mark_as_failed
       report(:failed, start, error.message)
       raise error
