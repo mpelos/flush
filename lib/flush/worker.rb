@@ -37,7 +37,7 @@ module Flush
       end
     rescue Exception => error
       update_workflow_scope
-      mark_as_failed
+      mark_as_failed(error)
       report(:failed, start, error.message)
       raise error
     end
@@ -82,9 +82,16 @@ module Flush
       client.persist_job(workflow.id, job)
     end
 
-    def mark_as_failed
+    def mark_as_failed(error)
       job.fail!
       client.fail_workflow(workflow)
+
+      job.workflow.merge_scope({ error: {
+        class: error.class.to_s,
+        message: error.message,
+        backtrace: error.backtrace
+      }})
+
       client.persist_job(workflow.id, job)
     end
 
