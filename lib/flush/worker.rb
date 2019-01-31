@@ -83,15 +83,15 @@ module Flush
     end
 
     def mark_as_failed(error)
-      job.fail!
-      client.fail_workflow(workflow)
-
       job.workflow.merge_scope({ error: {
         class: error.class.to_s,
         message: error.message,
         backtrace: error.backtrace
       }})
+      client.persist_workflow(job.workflow)
 
+      job.fail!
+      client.fail_workflow(workflow)
       client.persist_job(workflow.id, job)
     end
 
