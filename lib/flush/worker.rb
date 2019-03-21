@@ -6,15 +6,16 @@ module Flush
     sidekiq_options retry: false
 
     def perform(workflow_id, job_id, retrying = false)
-      setup_job(workflow_id, job_id)
+      workflow = client.find_workflow(workflow_id)
+      job = workflow.find_job(job_id)
 
       start = Time.now
-      report(:started, start)
+      report(job, :started, start)
 
       failed = false
       error = nil
 
-      mark_as_started
+      mark_as_started(job)
       job.mark_as_retried if retrying
 
       if job.should_run?
@@ -24,34 +25,29 @@ module Flush
         job.mark_as_skipped
       end
 
-      wait_until_job_is_done!
-      update_workflow_scope
-      mark_as_finished
+      wait_until_job_is_done!(job)
+      update_workflow_scope(job)
+      mark_as_finished(job)
 
-      report(:finished, start)
+      report(job, :finished, start)
 
       if workflow.finished?
         client.finish_workflow(workflow)
       else
-        enqueue_outgoing_jobs
+        enqueue_outgoing_jobs(job)
       end
     rescue Exception => error
-      update_workflow_scope
-      mark_as_failed(error)
-      report(:failed, start, error.message)
+      update_workflow_scope(job)
+      mark_as_failed(job, error)
+      report(job, :failed, start, error.message)
       raise error
     end
 
     private
-    attr_reader :client, :workflow, :job
+    attr_reader :client
 
     def client
       @client ||= Flush::Client.new
-    end
-
-    def setup_job(workflow_id, job_id)
-      @workflow ||= client.find_workflow(workflow_id)
-      @job ||= workflow.find_job(job_id)
     end
 
     def incoming_payloads
@@ -64,7 +60,7 @@ module Flush
       payloads
     end
 
-    def wait_until_job_is_done!
+    def wait_until_job_is_done!(job)
       loop do
         break if job.done?
         job.on_done_checking
@@ -72,17 +68,17 @@ module Flush
       end
     end
 
-    def update_workflow_scope
+    def update_workflow_scope(job)
       job.workflow.merge_scope(job.output_payload.symbolize_keys)
       client.persist_workflow(job.workflow)
     end
 
-    def mark_as_finished
+    def mark_as_finished(job)
       job.finish!
-      client.persist_job(workflow.id, job)
+      client.persist_job(job.workflow.id, job)
     end
 
-    def mark_as_failed(error)
+    def mark_as_failed(job, error)
       job.workflow.merge_scope({ error: {
         class: error.class.to_s,
         message: error.message,
@@ -91,16 +87,16 @@ module Flush
       client.persist_workflow(job.workflow)
 
       job.fail!
-      client.fail_workflow(workflow)
-      client.persist_job(workflow.id, job)
+      client.fail_workflow(job.workflow)
+      client.persist_job(job.workflow.id, job)
     end
 
-    def mark_as_started
+    def mark_as_started(job)
       job.start!
-      client.persist_job(workflow.id, job)
+      client.persist_job(job.workflow.id, job)
     end
 
-    def report_workflow_status
+    def report_workflow_status(workflow)
       client.workflow_report({
         workflow_id:  workflow.id,
         status:       workflow.status,
@@ -109,10 +105,10 @@ module Flush
       })
     end
 
-    def report(status, start, error = nil)
+    def report(job, status, start, error = nil)
       message = {
         status: status,
-        workflow_id: workflow.id,
+        workflow_id: job.workflow.id,
         job: job.name,
         duration: elapsed(start)
       }
@@ -124,11 +120,11 @@ module Flush
       (Time.now - start).to_f.round(3)
     end
 
-    def enqueue_outgoing_jobs
+    def enqueue_outgoing_jobs(job)
       job.outgoing.each do |job_name|
-        out = client.load_job(workflow.id, job_name)
+        out = client.load_job(job.workflow.id, job_name)
         if out.ready_to_start?
-          client.enqueue_job(workflow.id, out)
+          client.enqueue_job(job.workflow.id, out)
         end
       end
     end
